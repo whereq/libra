@@ -1,0 +1,148 @@
+# Development DP Environment Configuration
+# Corrected version of values-dev-dp.yaml
+
+# Namespace configuration
+namespace: spark-dpdev
+environment: dev  # ← ADDED: This was missing and caused the error
+
+# ==============================================================================
+# GCS Configuration
+# ==============================================================================
+gcs:
+  secretName: gcs-json-key
+  bucket: "dev-spark-bucket"
+  projectId: "cidat-10065-stg-8959"
+  serviceAccountEmail: "dev-devops-spark-cluster-1-rw@cidat-10065-stg-8959.iam.gserviceaccount.com"
+
+# ==============================================================================
+# Docker Image Configuration
+# ==============================================================================
+image:
+  repository: registry.kube.dp.ist.bns/dp-spark
+  tag: 4.0.1-v0.2
+  pullPolicy: IfNotPresent
+
+  # Add this if your registry requires authentication
+  # pullSecrets:
+  #   - name: dp-registry-secret
+
+# ==============================================================================
+# Spark Master Configuration
+# ==============================================================================
+master:
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    rpcPort: 7077
+    webUIPort: 8080
+
+  resources:
+    requests:
+      memory: "10Gi"
+      cpu: "500m"
+    limits:
+      memory: "10Gi"
+      cpu: "1000m"
+
+  env:
+    SPARK_MASTER_HOST: "0.0.0.0"
+    SPARK_MASTER_PORT: "7077"
+    SPARK_MASTER_WEBUI_PORT: "8080"
+
+# ==============================================================================
+# Spark Worker Configuration
+# ==============================================================================
+worker:
+  replicas: 2
+
+  service:
+    type: ClusterIP
+    webUIPort: 8081
+
+  resources:
+    requests:
+      memory: "10Gi"
+      cpu: "2000m"
+    limits:
+      memory: "10Gi"
+      cpu: "4000m"
+
+  # Leave ~2GB overhead: if limit is 10Gi, use 8g for SPARK_WORKER_MEMORY
+  env:
+    SPARK_WORKER_CORES: "2"
+    SPARK_WORKER_MEMORY: "8g"
+    SPARK_WORKER_WEBUI_PORT: "8081"
+    SPARK_MASTER_URL: "spark://spark-master:7077"
+
+# ==============================================================================
+# History Server (Optional)
+# ==============================================================================
+historyServer:
+  enabled: true  # Enable for dev testing
+
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    port: 18080
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# ==============================================================================
+# Spark Configuration
+# ==============================================================================
+sparkConfig:
+  master: "spark://spark-master:7077"
+  deployMode: "client"
+  schedulerMode: "FAIR"
+
+  eventLog:
+    enabled: true
+
+  performance:
+    dynamicAllocation:
+      enabled: false
+
+    network:
+      timeout: "600s"
+      executorHeartbeatInterval: "60s"
+
+# ==============================================================================
+# Storage
+# ==============================================================================
+storage:
+  persistentVolume:
+    enabled: false  # Use emptyDir for dev
+
+# ==============================================================================
+# Monitoring
+# ==============================================================================
+monitoring:
+  prometheus:
+    enabled: false
+
+  logging:
+    level: "DEBUG"  # Verbose logging for dev
+
+# ==============================================================================
+# Security
+# ==============================================================================
+security:
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 0
+    fsGroup: 0
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL

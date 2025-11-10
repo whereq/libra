@@ -1,0 +1,225 @@
+# ==============================================================================
+# WhereQ Spark Standalone Cluster with GCS - Configuration Values
+# ==============================================================================
+# This file contains all configurable parameters for deploying Spark standalone
+# cluster with GCS support to Kubernetes.
+#
+# Usage:
+#   1. Copy this file: cp values.yaml values-dev.yaml
+#   2. Edit values-dev.yaml with your settings
+#   3. Deploy: ./deploy.sh values-dev.yaml
+# ==============================================================================
+
+# Namespace configuration
+namespace: spark-platform
+
+# Environment label (for namespace labeling)
+environment: dev
+
+# ==============================================================================
+# GCS Configuration (RUNTIME - NOT baked into image)
+# ==============================================================================
+gcs:
+  # GCS Service Account Key Secret (must be pre-created)
+  # Create with: kubectl create secret generic gcs-service-account-key \
+  #   --from-file=gcs-key.json=./your-key.json -n spark-platform
+  secretName: gcs-service-account-key
+
+  # GCS Bucket name (for Spark data, events, warehouse)
+  bucket: "my-spark-bucket"
+
+  # Google Cloud Project ID
+  projectId: "my-gcp-project-id"
+
+  # Service Account Email (for reference/documentation only)
+  # This is in the key file, just documented here
+  serviceAccountEmail: "spark-sa@my-gcp-project-id.iam.gserviceaccount.com"
+
+# ==============================================================================
+# Docker Image Configuration
+# ==============================================================================
+image:
+  # Image repository and tag
+  repository: whereq/spark
+  tag: 4.0.1-gcs
+  pullPolicy: IfNotPresent
+
+  # Image pull secrets (if using private registry)
+  # pullSecrets:
+  #   - name: my-registry-secret
+
+# ==============================================================================
+# Spark Master Configuration
+# ==============================================================================
+master:
+  # Number of master replicas (1 for standalone, 3 for HA with ZooKeeper)
+  replicas: 1
+
+  # Service configuration
+  service:
+    type: ClusterIP  # Options: ClusterIP, LoadBalancer, NodePort
+    rpcPort: 7077
+    webUIPort: 8080
+
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+  # Environment variables
+  env:
+    SPARK_MASTER_HOST: "0.0.0.0"
+    SPARK_MASTER_PORT: "7077"
+    SPARK_MASTER_WEBUI_PORT: "8080"
+
+  # Node selector (optional)
+  # nodeSelector:
+  #   node-role: spark-master
+
+  # Tolerations (optional)
+  # tolerations:
+  #   - key: "spark"
+  #     operator: "Equal"
+  #     value: "master"
+  #     effect: "NoSchedule"
+
+# ==============================================================================
+# Spark Worker Configuration
+# ==============================================================================
+worker:
+  # Number of worker replicas
+  replicas: 3
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    webUIPort: 8081
+
+  # Worker resources (per worker)
+  resources:
+    requests:
+      memory: "8Gi"
+      cpu: "4000m"
+    limits:
+      memory: "16Gi"
+      cpu: "8000m"
+
+  # Spark worker settings
+  # Leave ~2GB overhead: if limit is 16Gi, use 14g for SPARK_WORKER_MEMORY
+  env:
+    SPARK_WORKER_CORES: "4"
+    SPARK_WORKER_MEMORY: "14g"
+    SPARK_WORKER_WEBUI_PORT: "8081"
+    SPARK_MASTER_URL: "spark://spark-master:7077"
+
+  # Node selector (optional)
+  # nodeSelector:
+  #   node-role: spark-worker
+
+  # Tolerations (optional)
+  # tolerations:
+  #   - key: "spark"
+  #     operator: "Equal"
+  #     value: "worker"
+  #     effect: "NoSchedule"
+
+# ==============================================================================
+# Spark History Server Configuration (Optional)
+# ==============================================================================
+historyServer:
+  # Enable history server
+  enabled: false
+
+  # Number of replicas
+  replicas: 1
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 18080
+
+  # Resource configuration
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# ==============================================================================
+# Spark Configuration Overrides
+# ==============================================================================
+# Additional Spark configurations to be injected at runtime
+sparkConfig:
+  # Master configuration
+  master: "spark://spark-master:7077"
+  deployMode: "client"
+  schedulerMode: "FAIR"
+
+  # Event logging (using GCS)
+  eventLog:
+    enabled: true
+    # dir is set dynamically: gs://${GCS_BUCKET}/spark_events
+
+  # SQL warehouse (using GCS)
+  # warehouse.dir is set dynamically: gs://${GCS_BUCKET}/spark_warehouse
+
+  # Performance tuning
+  performance:
+    dynamicAllocation:
+      enabled: false
+      minExecutors: 1
+      maxExecutors: 10
+
+    # Network settings for K8s
+    network:
+      timeout: "600s"
+      executorHeartbeatInterval: "60s"
+
+# ==============================================================================
+# Storage Configuration
+# ==============================================================================
+storage:
+  # Persistent volumes for local data (optional)
+  # Set to false to use emptyDir (ephemeral)
+  persistentVolume:
+    enabled: false
+    storageClass: "standard"
+    masterSize: "10Gi"
+    workerSize: "20Gi"
+
+# ==============================================================================
+# Monitoring & Logging
+# ==============================================================================
+monitoring:
+  # Enable Prometheus metrics
+  prometheus:
+    enabled: false
+    port: 8090
+
+  # Enable structured logging
+  logging:
+    level: "INFO"  # Options: DEBUG, INFO, WARN, ERROR
+
+# ==============================================================================
+# Security Configuration
+# ==============================================================================
+security:
+  # Pod security context
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 0
+    fsGroup: 0
+
+  # Container security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL

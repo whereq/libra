@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: whereq-libra
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Spark Configuration
+spark:
+  app-name: whereq-libra
+  master: local[*]  # Can be overridden for cluster deployment
+  config:
+    spark.driver.memory: 2g
+    spark.executor.memory: 2g
+    spark.sql.warehouse.dir: /tmp/spark-warehouse
+    spark.driver.host: localhost
+
+    # Enable FAIR scheduler for parallel job execution
+    spark.scheduler.mode: FAIR
+    # Note: fairscheduler.xml path will be set programmatically in SparkSessionManager
+    # to handle classpath resources properly
+
+# Libra-specific configuration
+libra:
+  session:
+    # Session management mode: SHARED or ISOLATED
+    # SHARED: Single SparkSession for all requests (better performance)
+    # ISOLATED: One SparkSession per user/session (better isolation)
+    mode: SHARED
+
+    # Maximum number of concurrent sessions (for ISOLATED mode)
+    max-sessions: 10
+
+    # Session timeout in minutes
+    timeout-minutes: 30
+
+    # Enable session pooling
+    pooling:
+      enabled: false
+      min-size: 2
+      max-size: 10
+
+# Management and Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# API Documentation
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.whereq.libra: DEBUG
+    org.apache.spark: WARN
+    org.apache.hadoop: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

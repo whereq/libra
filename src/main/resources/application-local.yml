@@ -1,0 +1,15 @@
+# Local development configuration (no external Spark cluster needed)
+spark:
+  master: local[*]
+  app-name: whereq-libra-local
+  config:
+    spark.driver.memory: 2g
+    spark.executor.memory: 2g
+    spark.sql.warehouse.dir: /tmp/spark-warehouse
+    spark.driver.host: localhost
+
+logging:
+  level:
+    root: INFO
+    com.whereq.libra: DEBUG
+    org.apache.spark: WARN

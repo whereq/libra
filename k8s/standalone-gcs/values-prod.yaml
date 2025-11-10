@@ -1,0 +1,163 @@
+# Production Environment Configuration
+# Complete configuration for production environment
+
+namespace: spark-platform-prod
+environment: prod
+
+# ==============================================================================
+# GCS Configuration
+# ==============================================================================
+gcs:
+  secretName: gcs-service-account-key
+  bucket: "prod-spark-bucket"
+  projectId: "my-project-prod"
+  serviceAccountEmail: "spark-sa@my-project-prod.iam.gserviceaccount.com"
+
+# ==============================================================================
+# Docker Image Configuration
+# ==============================================================================
+image:
+  repository: whereq/spark
+  tag: 4.0.1-gcs
+  pullPolicy: Always  # Always pull latest in prod
+
+# ==============================================================================
+# Spark Master Configuration
+# ==============================================================================
+master:
+  replicas: 1  # Use 3 with ZooKeeper for HA
+
+  service:
+    type: ClusterIP
+    rpcPort: 7077
+    webUIPort: 8080
+
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "2000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+
+  env:
+    SPARK_MASTER_HOST: "0.0.0.0"
+    SPARK_MASTER_PORT: "7077"
+    SPARK_MASTER_WEBUI_PORT: "8080"
+
+  # Production node affinity (optional)
+  # nodeSelector:
+  #   workload-type: spark-master
+
+# ==============================================================================
+# Spark Worker Configuration
+# ==============================================================================
+worker:
+  replicas: 10  # More workers for production
+
+  service:
+    type: ClusterIP
+    webUIPort: 8081
+
+  resources:
+    requests:
+      memory: "16Gi"
+      cpu: "8000m"
+    limits:
+      memory: "32Gi"
+      cpu: "16000m"
+
+  # Leave ~4GB overhead: if limit is 32Gi, use 28g for SPARK_WORKER_MEMORY
+  env:
+    SPARK_WORKER_CORES: "8"
+    SPARK_WORKER_MEMORY: "28g"
+    SPARK_WORKER_WEBUI_PORT: "8081"
+    SPARK_MASTER_URL: "spark://spark-master:7077"
+
+  # Production node affinity
+  nodeSelector:
+    workload-type: spark
+
+  tolerations:
+    - key: "spark"
+      operator: "Equal"
+      value: "worker"
+      effect: "NoSchedule"
+
+# ==============================================================================
+# History Server
+# ==============================================================================
+historyServer:
+  enabled: true
+
+  replicas: 2  # HA history server
+
+  service:
+    type: ClusterIP
+    port: 18080
+
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+# ==============================================================================
+# Spark Configuration
+# ==============================================================================
+sparkConfig:
+  master: "spark://spark-master:7077"
+  deployMode: "client"
+  schedulerMode: "FAIR"
+
+  eventLog:
+    enabled: true
+
+  performance:
+    dynamicAllocation:
+      enabled: true
+      minExecutors: 5
+      maxExecutors: 50
+
+    network:
+      timeout: "600s"
+      executorHeartbeatInterval: "60s"
+
+# ==============================================================================
+# Storage Configuration
+# ==============================================================================
+storage:
+  persistentVolume:
+    enabled: true  # Use PVs in production
+    storageClass: "ssd-retain"
+    masterSize: "50Gi"
+    workerSize: "100Gi"
+
+# ==============================================================================
+# Monitoring & Logging
+# ==============================================================================
+monitoring:
+  prometheus:
+    enabled: true
+    port: 8090
+
+  logging:
+    level: "INFO"
+
+# ==============================================================================
+# Security Configuration
+# ==============================================================================
+security:
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 0
+    fsGroup: 0
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL

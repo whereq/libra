@@ -1,0 +1,111 @@
+# Spark Worker StatefulSet with GCS Support
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spark-worker
+  namespace: ${NAMESPACE}
+  labels:
+    app: spark-worker
+    component: spark
+    storage: gcs
+spec:
+  serviceName: spark-worker
+  replicas: ${WORKER_REPLICAS}
+  selector:
+    matchLabels:
+      app: spark-worker
+  template:
+    metadata:
+      labels:
+        app: spark-worker
+        component: spark
+        storage: gcs
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+
+      containers:
+      - name: spark-worker
+        image: ${IMAGE_REPOSITORY}:${IMAGE_TAG}
+        imagePullPolicy: ${IMAGE_PULL_POLICY}
+
+        ports:
+        - containerPort: ${WORKER_WEBUI_PORT}
+          name: worker-ui
+
+        env:
+        - name: SPARK_MODE
+          value: "worker"
+        - name: SPARK_MASTER_URL
+          value: "spark://spark-master:${MASTER_RPC_PORT}"
+        - name: SPARK_WORKER_CORES
+          value: "${WORKER_CORES}"
+        - name: SPARK_WORKER_MEMORY
+          value: "${WORKER_MEMORY}"
+        - name: SPARK_WORKER_WEBUI_PORT
+          value: "${WORKER_WEBUI_PORT}"
+
+        # GCS Configuration (from values.yaml)
+        - name: GCS_BUCKET
+          value: "${GCS_BUCKET}"
+        - name: GCS_PROJECT_ID
+          value: "${GCS_PROJECT_ID}"
+
+        volumeMounts:
+        # GCS service account key from Secret
+        - name: gcs-key
+          mountPath: /opt/spark/conf/gcs-json-key
+          readOnly: true
+
+        resources:
+          requests:
+            memory: "${WORKER_MEMORY_REQUEST}"
+            cpu: "${WORKER_CPU_REQUEST}"
+          limits:
+            memory: "${WORKER_MEMORY_LIMIT}"
+            cpu: "${WORKER_CPU_LIMIT}"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: ${WORKER_WEBUI_PORT}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: ${WORKER_WEBUI_PORT}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      volumes:
+      # GCS service account key Secret
+      - name: gcs-key
+        secret:
+          secretName: ${GCS_SECRET_NAME}
+          items:
+          - key: gcs-key.json
+            path: gcs-key.json
+            mode: 0400
+
+---
+# Spark Worker Service (for accessing individual worker UIs)
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-worker
+  namespace: ${NAMESPACE}
+  labels:
+    app: spark-worker
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: spark-worker
+  ports:
+  - name: worker-ui
+    port: ${WORKER_WEBUI_PORT}
+    targetPort: ${WORKER_WEBUI_PORT}

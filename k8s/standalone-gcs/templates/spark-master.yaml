@@ -1,0 +1,113 @@
+# Spark Master StatefulSet with GCS Support
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spark-master
+  namespace: ${NAMESPACE}
+  labels:
+    app: spark-master
+    component: spark
+    storage: gcs
+spec:
+  serviceName: spark-master
+  replicas: ${MASTER_REPLICAS}
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      labels:
+        app: spark-master
+        component: spark
+        storage: gcs
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+
+      containers:
+      - name: spark-master
+        image: ${IMAGE_REPOSITORY}:${IMAGE_TAG}
+        imagePullPolicy: ${IMAGE_PULL_POLICY}
+
+        ports:
+        - containerPort: ${MASTER_RPC_PORT}
+          name: spark-rpc
+        - containerPort: ${MASTER_WEBUI_PORT}
+          name: spark-ui
+
+        env:
+        - name: SPARK_MODE
+          value: "master"
+        - name: SPARK_MASTER_HOST
+          value: "0.0.0.0"
+        - name: SPARK_MASTER_PORT
+          value: "${MASTER_RPC_PORT}"
+        - name: SPARK_MASTER_WEBUI_PORT
+          value: "${MASTER_WEBUI_PORT}"
+
+        # GCS Configuration (from values.yaml)
+        - name: GCS_BUCKET
+          value: "${GCS_BUCKET}"
+        - name: GCS_PROJECT_ID
+          value: "${GCS_PROJECT_ID}"
+
+        volumeMounts:
+        # GCS service account key from Secret
+        - name: gcs-key
+          mountPath: /opt/spark/conf/gcs-json-key
+          readOnly: true
+
+        resources:
+          requests:
+            memory: "${MASTER_MEMORY_REQUEST}"
+            cpu: "${MASTER_CPU_REQUEST}"
+          limits:
+            memory: "${MASTER_MEMORY_LIMIT}"
+            cpu: "${MASTER_CPU_LIMIT}"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: ${MASTER_WEBUI_PORT}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: ${MASTER_WEBUI_PORT}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      volumes:
+      # GCS service account key Secret
+      - name: gcs-key
+        secret:
+          secretName: ${GCS_SECRET_NAME}
+          items:
+          - key: gcs-key.json
+            path: gcs-key.json
+            mode: 0400
+
+---
+# Spark Master Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master
+  namespace: ${NAMESPACE}
+  labels:
+    app: spark-master
+spec:
+  type: ${MASTER_SERVICE_TYPE}
+  selector:
+    app: spark-master
+  ports:
+  - name: spark-rpc
+    port: ${MASTER_RPC_PORT}
+    targetPort: ${MASTER_RPC_PORT}
+  - name: spark-ui
+    port: ${MASTER_WEBUI_PORT}
+    targetPort: ${MASTER_WEBUI_PORT}

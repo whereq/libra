@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spark-platform
+  labels:
+    name: spark-platform
+    app: whereq-libra

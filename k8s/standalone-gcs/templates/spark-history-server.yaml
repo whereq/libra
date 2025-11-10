@@ -1,0 +1,104 @@
+# Spark History Server StatefulSet with GCS Support
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spark-history-server
+  namespace: ${NAMESPACE}
+  labels:
+    app: spark-history-server
+    component: spark
+    storage: gcs
+spec:
+  serviceName: spark-history-server
+  replicas: ${HISTORY_REPLICAS}
+  selector:
+    matchLabels:
+      app: spark-history-server
+  template:
+    metadata:
+      labels:
+        app: spark-history-server
+        component: spark
+        storage: gcs
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+
+      containers:
+      - name: spark-history-server
+        image: ${IMAGE_REPOSITORY}:${IMAGE_TAG}
+        imagePullPolicy: ${IMAGE_PULL_POLICY}
+
+        ports:
+        - containerPort: ${HISTORY_PORT}
+          name: history-ui
+
+        env:
+        - name: SPARK_MODE
+          value: "history"
+        - name: SPARK_HISTORY_OPTS
+          value: "-Dspark.history.fs.logDirectory=gs://${GCS_BUCKET}/spark_events -Dspark.history.ui.port=${HISTORY_PORT}"
+
+        # GCS Configuration (from values.yaml)
+        - name: GCS_BUCKET
+          value: "${GCS_BUCKET}"
+        - name: GCS_PROJECT_ID
+          value: "${GCS_PROJECT_ID}"
+
+        volumeMounts:
+        # GCS service account key from Secret
+        - name: gcs-key
+          mountPath: /opt/spark/conf/gcs-json-key
+          readOnly: true
+
+        resources:
+          requests:
+            memory: "${HISTORY_MEMORY_REQUEST}"
+            cpu: "${HISTORY_CPU_REQUEST}"
+          limits:
+            memory: "${HISTORY_MEMORY_LIMIT}"
+            cpu: "${HISTORY_CPU_LIMIT}"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: ${HISTORY_PORT}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: ${HISTORY_PORT}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      volumes:
+      # GCS service account key Secret
+      - name: gcs-key
+        secret:
+          secretName: ${GCS_SECRET_NAME}
+          items:
+          - key: gcs-key.json
+            path: gcs-key.json
+            mode: 0400
+
+---
+# Spark History Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-history-server
+  namespace: ${NAMESPACE}
+  labels:
+    app: spark-history-server
+spec:
+  type: ${HISTORY_SERVICE_TYPE}
+  selector:
+    app: spark-history-server
+  ports:
+  - name: history-ui
+    port: ${HISTORY_PORT}
+    targetPort: ${HISTORY_PORT}

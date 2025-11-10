@@ -1,0 +1,149 @@
+# Development Environment Configuration
+# Complete configuration for dev environment
+
+namespace: spark-platform
+environment: dev
+
+# ==============================================================================
+# GCS Configuration
+# ==============================================================================
+gcs:
+  secretName: gcs-service-account-key
+  bucket: "dev-spark-bucket"
+  projectId: "my-project-dev"
+  serviceAccountEmail: "spark-sa@my-project-dev.iam.gserviceaccount.com"
+
+# ==============================================================================
+# Docker Image Configuration
+# ==============================================================================
+image:
+  repository: whereq/spark
+  tag: 4.0.1-gcs
+  pullPolicy: IfNotPresent
+
+# ==============================================================================
+# Spark Master Configuration
+# ==============================================================================
+master:
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    rpcPort: 7077
+    webUIPort: 8080
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+  env:
+    SPARK_MASTER_HOST: "0.0.0.0"
+    SPARK_MASTER_PORT: "7077"
+    SPARK_MASTER_WEBUI_PORT: "8080"
+
+# ==============================================================================
+# Spark Worker Configuration
+# ==============================================================================
+worker:
+  replicas: 2  # Fewer workers for dev
+
+  service:
+    type: ClusterIP
+    webUIPort: 8081
+
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "2000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+
+  # Leave ~2GB overhead: if limit is 8Gi, use 6g for SPARK_WORKER_MEMORY
+  env:
+    SPARK_WORKER_CORES: "2"
+    SPARK_WORKER_MEMORY: "6g"
+    SPARK_WORKER_WEBUI_PORT: "8081"
+    SPARK_MASTER_URL: "spark://spark-master:7077"
+
+# ==============================================================================
+# History Server (Optional)
+# ==============================================================================
+historyServer:
+  enabled: true  # Enable for dev testing
+
+  replicas: 1
+
+  service:
+    type: ClusterIP
+    port: 18080
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# ==============================================================================
+# Spark Configuration
+# ==============================================================================
+sparkConfig:
+  master: "spark://spark-master:7077"
+  deployMode: "client"
+  schedulerMode: "FAIR"
+
+  eventLog:
+    enabled: true
+
+  performance:
+    dynamicAllocation:
+      enabled: false
+      minExecutors: 1
+      maxExecutors: 10
+
+    network:
+      timeout: "600s"
+      executorHeartbeatInterval: "60s"
+
+# ==============================================================================
+# Storage Configuration
+# ==============================================================================
+storage:
+  persistentVolume:
+    enabled: false
+    storageClass: "standard"
+    masterSize: "10Gi"
+    workerSize: "20Gi"
+
+# ==============================================================================
+# Monitoring & Logging
+# ==============================================================================
+monitoring:
+  prometheus:
+    enabled: false
+    port: 8090
+
+  logging:
+    level: "DEBUG"  # More verbose for dev
+
+# ==============================================================================
+# Security Configuration
+# ==============================================================================
+security:
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 0
+    fsGroup: 0
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL

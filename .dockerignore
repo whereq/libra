@@ -1,0 +1,11 @@
+target/
+.git/
+.gitignore
+.vscode/
+.idea/
+*.iml
+*.log
+.DS_Store
+README.md
+.env
+# Note: Spark entrypoints are in docker/*/entrypoint.sh for modular builds

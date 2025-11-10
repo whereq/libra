@@ -1,0 +1,105 @@
+---
+# Libra Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: libra
+  namespace: spark-platform
+  labels:
+    app: libra
+    component: driver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: libra
+  template:
+    metadata:
+      labels:
+        app: libra
+        component: driver
+    spec:
+      containers:
+      - name: libra
+        image: whereq/libra:1.0.0  # Build and push your image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 4040
+          name: spark-ui
+        - containerPort: 7078
+          name: driver-rpc
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "k8s"
+        - name: JAVA_OPTS
+          value: "-Xmx2g -Xms1g"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+---
+# Libra Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: libra-service
+  namespace: spark-platform
+  labels:
+    app: libra
+spec:
+  type: LoadBalancer  # or NodePort for on-prem, or Ingress
+  selector:
+    app: libra
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: spark-ui
+    port: 4040
+    targetPort: 4040
+  - name: driver-rpc
+    port: 7078
+    targetPort: 7078
+
+---
+# Libra Ingress (optional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: libra-ingress
+  namespace: spark-platform
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: libra.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: libra-service
+            port:
+              number: 80

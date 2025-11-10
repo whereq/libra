@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!--
+  Spark FAIR Scheduler Configuration for WhereQ Libra
+
+  This configuration enables parallel job execution by allocating
+  resources fairly among concurrent jobs.
+
+  Author: WhereQ Inc.
+-->
+<allocations>
+  <!-- Default pool for all jobs -->
+  <pool name="default">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>1</weight>
+    <minShare>2</minShare>
+  </pool>
+
+  <!-- High priority pool for critical jobs -->
+  <pool name="high-priority">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>3</weight>
+    <minShare>4</minShare>
+  </pool>
+
+  <!-- Low priority pool for background jobs -->
+  <pool name="low-priority">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>1</weight>
+    <minShare>1</minShare>
+  </pool>
+
+  <!-- Interactive pool for ad-hoc queries -->
+  <pool name="interactive">
+    <schedulingMode>FAIR</schedulingMode>
+    <weight>2</weight>
+    <minShare>2</minShare>
+  </pool>
+</allocations>

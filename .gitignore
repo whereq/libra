@@ -1,0 +1,61 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Java
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.project
+.classpath
+.settings/
+bin/
+.metadata/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Spring Boot
+spring-boot-*.log
+
+# Lombok
+lombok.config
+
+# Spark
+derby.log
+metastore_db/
+spark-warehouse/
+data/
+
+# Docker
+.docker/
+
+# Environment
+.env
+.env.local
+
+# Logs
+logs/
+*.log

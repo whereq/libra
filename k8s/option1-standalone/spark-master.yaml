@@ -1,0 +1,77 @@
+---
+# Spark Master Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-master
+  namespace: spark-platform
+  labels:
+    app: spark-master
+    component: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      labels:
+        app: spark-master
+        component: spark
+    spec:
+      containers:
+      - name: spark-master
+        image: apache/spark:4.0.1
+        command: ["/opt/spark/sbin/start-master.sh"]
+        ports:
+        - containerPort: 7077
+          name: spark-rpc
+        - containerPort: 8080
+          name: spark-ui
+        env:
+        - name: SPARK_MODE
+          value: "master"
+        - name: SPARK_MASTER_HOST
+          value: "0.0.0.0"
+        - name: SPARK_MASTER_PORT
+          value: "7077"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Spark Master Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master
+  namespace: spark-platform
+  labels:
+    app: spark-master
+spec:
+  type: ClusterIP
+  selector:
+    app: spark-master
+  ports:
+  - name: spark-rpc
+    port: 7077
+    targetPort: 7077
+  - name: spark-ui
+    port: 8080
+    targetPort: 8080
