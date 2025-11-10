@@ -1,0 +1,85 @@
+---
+# Libra Deployment for Native K8s Mode
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: libra-native
+  namespace: spark-platform
+  labels:
+    app: libra-native
+    component: driver
+    mode: k8s-native
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: libra-native
+  template:
+    metadata:
+      labels:
+        app: libra-native
+        component: driver
+        mode: k8s-native
+    spec:
+      serviceAccountName: spark-driver  # CRITICAL: Needs permissions to create pods
+      containers:
+      - name: libra
+        image: whereq/libra:1.0.0  # Build and push your image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 4040
+          name: spark-ui
+        - containerPort: 7078
+          name: driver-rpc
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "k8s-native"
+        - name: JAVA_OPTS
+          value: "-Xmx2g -Xms1g"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+
+---
+# Libra Service for Native Mode
+apiVersion: v1
+kind: Service
+metadata:
+  name: libra-service
+  namespace: spark-platform
+  labels:
+    app: libra-native
+spec:
+  type: LoadBalancer
+  selector:
+    app: libra-native
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+  - name: spark-ui
+    port: 4040
+    targetPort: 4040
+  - name: driver-rpc
+    port: 7078
+    targetPort: 7078

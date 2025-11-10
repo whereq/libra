@@ -1,0 +1,41 @@
+# Kubernetes deployment configuration - Option 1
+# Libra connects to standalone Spark cluster (master + workers) in K8s
+# Deploy with: SPRING_PROFILES_ACTIVE=k8s
+
+spark:
+  master: spark://spark-master:7077  # K8s service name for Spark master
+  app-name: whereq-libra-k8s
+  config:
+    # CRITICAL: Driver (Libra) must be reachable by executors
+    # Use the Kubernetes service name that routes to Libra
+    spark.driver.host: libra-service
+    spark.driver.port: 7078
+    spark.driver.bindAddress: 0.0.0.0
+
+    # Memory configuration
+    spark.driver.memory: 2g
+    spark.executor.memory: 2g
+    spark.executor.cores: 2
+
+    # Static allocation (workers are pre-deployed)
+    spark.dynamicAllocation.enabled: "false"
+    spark.executor.instances: 2
+
+    # Network timeouts for K8s environment
+    spark.network.timeout: 300s
+    spark.executor.heartbeatInterval: 30s
+    spark.rpc.askTimeout: 120s
+
+    # Spark UI
+    spark.ui.enabled: "true"
+    spark.ui.port: 4040
+
+server:
+  address: 0.0.0.0
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.whereq.libra: DEBUG
+    org.apache.spark: WARN

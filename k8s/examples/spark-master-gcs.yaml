@@ -1,0 +1,139 @@
+# ==============================================================================
+# Spark Master with GCS Support - Kubernetes Deployment
+# ==============================================================================
+# This example shows how to deploy Spark Master with GCS configuration.
+#
+# Prerequisites:
+#   1. GCS service account key created as Kubernetes Secret
+#   2. GCS configuration in ConfigMap
+#   3. GCS-enabled Docker image: whereq/spark:4.0.1-gcs
+#
+# Key Points:
+#   - NO credentials baked into Docker image
+#   - GCS bucket and project ID provided via ConfigMap (environment variables)
+#   - Service account key mounted from Secret (file mount)
+#   - Configuration can be changed without rebuilding image
+# ==============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-master-gcs
+  namespace: spark-platform
+  labels:
+    app: spark-master
+    component: spark
+    storage: gcs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-master
+  template:
+    metadata:
+      labels:
+        app: spark-master
+        component: spark
+        storage: gcs
+    spec:
+      containers:
+      - name: spark-master
+        image: whereq/spark:4.0.1-gcs
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 7077
+          name: spark-rpc
+        - containerPort: 8080
+          name: spark-ui
+
+        # RUNTIME environment variables from ConfigMap
+        env:
+        - name: SPARK_MODE
+          value: "master"
+        - name: SPARK_MASTER_HOST
+          value: "0.0.0.0"
+        - name: SPARK_MASTER_PORT
+          value: "7077"
+
+        # GCS Configuration from ConfigMap (NOT baked into image!)
+        - name: GCS_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: spark-gcs-config-dev  # Change to -staging or -prod
+              key: GCS_BUCKET
+        - name: GCS_PROJECT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: spark-gcs-config-dev
+              key: GCS_PROJECT_ID
+
+        volumeMounts:
+        # Mount GCS service account key from Secret (NOT in image!)
+        - name: gcs-key
+          mountPath: /opt/spark/conf/gcs-json-key
+          readOnly: true
+
+        # Mount additional runtime configuration from ConfigMap
+        - name: spark-config
+          mountPath: /opt/spark/conf/spark-env-overrides.conf
+          subPath: spark-env-overrides.conf
+          readOnly: true
+
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      volumes:
+      # Secret containing GCS service account key JSON
+      - name: gcs-key
+        secret:
+          secretName: gcs-service-account-key
+          items:
+          - key: gcs-key.json
+            path: gcs-key.json
+            mode: 0400  # Read-only for owner
+
+      # ConfigMap with runtime Spark configuration
+      - name: spark-config
+        configMap:
+          name: spark-gcs-config-dev  # Change to -staging or -prod
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-master
+  namespace: spark-platform
+  labels:
+    app: spark-master
+spec:
+  type: ClusterIP
+  selector:
+    app: spark-master
+  ports:
+  - name: spark-rpc
+    port: 7077
+    targetPort: 7077
+  - name: spark-ui
+    port: 8080
+    targetPort: 8080

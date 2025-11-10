@@ -1,0 +1,38 @@
+---
+# Service Account for Spark Driver (Libra)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spark-driver
+  namespace: spark-platform
+
+---
+# Role for creating executor pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: spark-driver-role
+  namespace: spark-platform
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["create", "get", "list", "watch", "delete", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spark-driver-rolebinding
+  namespace: spark-platform
+subjects:
+- kind: ServiceAccount
+  name: spark-driver
+  namespace: spark-platform
+roleRef:
+  kind: Role
+  name: spark-driver-role
+  apiGroup: rbac.authorization.k8s.io

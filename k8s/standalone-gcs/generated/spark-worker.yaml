@@ -1,0 +1,111 @@
+# Spark Worker StatefulSet with GCS Support
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spark-worker
+  namespace: spark-platform
+  labels:
+    app: spark-worker
+    component: spark
+    storage: gcs
+spec:
+  serviceName: spark-worker
+  replicas: 3
+  selector:
+    matchLabels:
+      app: spark-worker
+  template:
+    metadata:
+      labels:
+        app: spark-worker
+        component: spark
+        storage: gcs
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+
+      containers:
+      - name: spark-worker
+        image: whereq/spark:4.0.1-gcs
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 8081
+          name: worker-ui
+
+        env:
+        - name: SPARK_MODE
+          value: "worker"
+        - name: SPARK_MASTER_URL
+          value: "spark://spark-master:7077"
+        - name: SPARK_WORKER_CORES
+          value: "4"
+        - name: SPARK_WORKER_MEMORY
+          value: "14g"
+        - name: SPARK_WORKER_WEBUI_PORT
+          value: "8081"
+
+        # GCS Configuration (from values.yaml)
+        - name: GCS_BUCKET
+          value: "my-spark-bucket"
+        - name: GCS_PROJECT_ID
+          value: "my-gcp-project-id"
+
+        volumeMounts:
+        # GCS service account key from Secret
+        - name: gcs-key
+          mountPath: /opt/spark/conf/gcs-json-key
+          readOnly: true
+
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "4000m"
+          limits:
+            memory: "16Gi"
+            cpu: "8000m"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      volumes:
+      # GCS service account key Secret
+      - name: gcs-key
+        secret:
+          secretName: gcs-service-account-key
+          items:
+          - key: gcs-key.json
+            path: gcs-key.json
+            mode: 0400
+
+---
+# Spark Worker Service (for accessing individual worker UIs)
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-worker
+  namespace: spark-platform
+  labels:
+    app: spark-worker
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: spark-worker
+  ports:
+  - name: worker-ui
+    port: 8081
+    targetPort: 8081

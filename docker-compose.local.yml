@@ -1,0 +1,30 @@
+# Simple docker-compose for local development
+# This runs the application in Spark local mode (no separate cluster needed)
+# Usage: docker-compose -f docker-compose.local.yml up --build
+
+services:
+  libra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whereq-libra
+    ports:
+      - "8080:8080"  # API port
+      - "4040:4040"  # Spark UI port
+      - "5005:5005"  # Debug port
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - SPARK_MASTER=local[*]
+      - JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Xmx2g -Xms1g
+    volumes:
+      - ./data:/app/data
+      - spark-warehouse:/tmp/spark-warehouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  spark-warehouse:

@@ -1,0 +1,11 @@
+# Docker-specific configuration
+spark:
+  master: spark://spark-master:7077
+  config:
+    spark.driver.host: whereq-libra
+    spark.driver.bindAddress: 0.0.0.0
+    spark.ui.enabled: "true"
+    spark.ui.port: 4040
+
+server:
+  address: 0.0.0.0

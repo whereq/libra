@@ -1,0 +1,51 @@
+# Kubernetes native Spark configuration - Option 3
+# Spark dynamically creates driver and executor pods
+# Deploy with: SPRING_PROFILES_ACTIVE=k8s-native
+
+spark:
+  # Point to K8s API server (Spark will create pods dynamically)
+  master: k8s://https://kubernetes.default.svc:443
+  app-name: whereq-libra-k8s-native
+  config:
+    # Kubernetes namespace for Spark resources
+    spark.kubernetes.namespace: spark-platform
+
+    # Container image for executors
+    spark.kubernetes.container.image: apache/spark:4.0.1
+    spark.kubernetes.container.image.pullPolicy: IfNotPresent
+
+    # Driver configuration (Libra pod itself)
+    spark.kubernetes.driver.pod.name: libra-driver
+    spark.driver.host: libra-service
+    spark.driver.port: 7078
+    spark.driver.bindAddress: 0.0.0.0
+    spark.driver.memory: 2g
+
+    # Executor configuration (dynamically created)
+    spark.executor.instances: 2
+    spark.executor.memory: 2g
+    spark.executor.cores: 2
+    spark.kubernetes.executor.request.cores: 2
+
+    # Service account for creating pods
+    spark.kubernetes.authenticate.driver.serviceAccountName: spark-driver
+
+    # Network and timeouts
+    spark.network.timeout: 300s
+    spark.executor.heartbeatInterval: 30s
+    spark.rpc.askTimeout: 120s
+
+    # Spark UI
+    spark.ui.enabled: "true"
+    spark.ui.port: 4040
+
+server:
+  address: 0.0.0.0
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.whereq.libra: DEBUG
+    org.apache.spark: WARN
+    org.apache.spark.deploy.k8s: DEBUG  # K8s-specific logging

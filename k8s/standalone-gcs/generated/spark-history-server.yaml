@@ -1,0 +1,104 @@
+# Spark History Server StatefulSet with GCS Support
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: spark-history-server
+  namespace: spark-platform
+  labels:
+    app: spark-history-server
+    component: spark
+    storage: gcs
+spec:
+  serviceName: spark-history-server
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-history-server
+  template:
+    metadata:
+      labels:
+        app: spark-history-server
+        component: spark
+        storage: gcs
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+
+      containers:
+      - name: spark-history-server
+        image: whereq/spark:4.0.1-gcs
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 18080
+          name: history-ui
+
+        env:
+        - name: SPARK_MODE
+          value: "history"
+        - name: SPARK_HISTORY_OPTS
+          value: "-Dspark.history.fs.logDirectory=gs://my-spark-bucket/spark-events -Dspark.history.ui.port=18080"
+
+        # GCS Configuration (from values.yaml)
+        - name: GCS_BUCKET
+          value: "my-spark-bucket"
+        - name: GCS_PROJECT_ID
+          value: "my-gcp-project-id"
+
+        volumeMounts:
+        # GCS service account key from Secret
+        - name: gcs-key
+          mountPath: /opt/spark/conf/gcs-json-key
+          readOnly: true
+
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 18080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 18080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      volumes:
+      # GCS service account key Secret
+      - name: gcs-key
+        secret:
+          secretName: gcs-service-account-key
+          items:
+          - key: gcs-key.json
+            path: gcs-key.json
+            mode: 0400
+
+---
+# Spark History Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-history-server
+  namespace: spark-platform
+  labels:
+    app: spark-history-server
+spec:
+  type: ClusterIP
+  selector:
+    app: spark-history-server
+  ports:
+  - name: history-ui
+    port: 18080
+    targetPort: 18080

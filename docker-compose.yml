@@ -1,0 +1,80 @@
+# Full Spark 4.0.1 cluster setup with master and worker nodes
+# Usage: docker-compose up --build
+
+services:
+  libra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whereq-libra
+    ports:
+      - "8080:8080"  # API port
+      - "4040:4040"  # Spark UI port
+      - "5005:5005"  # Debug port
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Xmx2g -Xms1g
+    volumes:
+      - ./data:/app/data
+      - spark-warehouse:/tmp/spark-warehouse
+    networks:
+      - spark-network
+    depends_on:
+      - spark-master
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  spark-master:
+    build:
+      context: .
+      dockerfile: docker/base/Dockerfile
+    container_name: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "7077:7077"  # Spark master port
+      - "8081:8080"  # Spark master UI
+    networks:
+      - spark-network
+    volumes:
+      - spark-master-data:/opt/spark/work
+
+  spark-worker:
+    build:
+      context: .
+      dockerfile: docker/base/Dockerfile
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8082:8081"  # Spark worker UI
+    networks:
+      - spark-network
+    depends_on:
+      - spark-master
+    volumes:
+      - spark-worker-data:/opt/spark/work
+
+networks:
+  spark-network:
+    driver: bridge
+
+volumes:
+  spark-master-data:
+  spark-worker-data:
+  spark-warehouse:

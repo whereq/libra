@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  Google Cloud Storage (GCS) Hadoop Configuration Template
+
+  This configuration enables Spark to access GCS buckets.
+
+  Authentication Methods:
+    1. Service Account JSON Key (default)
+    2. Application Default Credentials (for GKE Workload Identity)
+
+  Usage:
+    - Mount GCS service account JSON to: /opt/spark/conf/gcs-json-key/gcs-key.json
+    - Or use Workload Identity by setting fs.gs.auth.type=APPLICATION_DEFAULT
+-->
+<configuration>
+    <!-- GCS FileSystem Implementation -->
+    <property>
+        <name>fs.gs.impl</name>
+        <value>com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem</value>
+        <description>Register GCS Hadoop filesystem implementation</description>
+    </property>
+
+    <property>
+        <name>fs.AbstractFileSystem.gs.impl</name>
+        <value>com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS</value>
+        <description>The AbstractFileSystem implementation for gs:// URIs</description>
+    </property>
+
+    <!-- GCS Project Configuration (Optional) -->
+    <property>
+        <name>fs.gs.project.id</name>
+        <value>${GCS_PROJECT_ID}</value>
+        <description>
+            Google Cloud Project ID with access to GCS buckets.
+            Required only for list buckets and create bucket operations.
+            Can be set via environment variable: GCS_PROJECT_ID
+        </description>
+    </property>
+
+    <!-- Authentication Configuration -->
+    <!-- Method 1: Service Account JSON Key (Default) -->
+    <property>
+        <name>fs.gs.auth.type</name>
+        <value>SERVICE_ACCOUNT_JSON_KEYFILE</value>
+        <description>
+            Authentication type for GCS access.
+            Options: SERVICE_ACCOUNT_JSON_KEYFILE, APPLICATION_DEFAULT, USER_CREDENTIALS
+        </description>
+    </property>
+
+    <property>
+        <name>fs.gs.auth.service.account.json.keyfile</name>
+        <value>/opt/spark/conf/gcs-json-key/gcs-key.json</value>
+        <description>
+            Path to the GCS service account JSON key file.
+            Mount this file as a Kubernetes secret in production.
+        </description>
+    </property>
+
+    <property>
+        <name>google.cloud.auth.type</name>
+        <value>SERVICE_ACCOUNT_JSON_KEYFILE</value>
+        <description>Authentication type for Google Cloud APIs</description>
+    </property>
+
+    <property>
+        <name>google.cloud.auth.service.account.json.keyfile</name>
+        <value>/opt/spark/conf/gcs-json-key/gcs-key.json</value>
+        <description>Path to service account key for Google Cloud APIs</description>
+    </property>
+
+    <!-- Method 2: Application Default Credentials (GKE Workload Identity) -->
+    <!--
+    <property>
+        <name>fs.gs.auth.type</name>
+        <value>APPLICATION_DEFAULT</value>
+        <description>Use GKE Workload Identity or compute engine default service account</description>
+    </property>
+    -->
+
+    <!-- Performance Tuning -->
+    <property>
+        <name>fs.gs.block.size</name>
+        <value>134217728</value>
+        <description>GCS block size (128MB). Larger values improve performance for large files.</description>
+    </property>
+
+    <property>
+        <name>fs.gs.http.max.retry</name>
+        <value>10</value>
+        <description>Maximum number of retries for GCS HTTP requests</description>
+    </property>
+
+    <property>
+        <name>fs.gs.http.connect-timeout</name>
+        <value>60000</value>
+        <description>HTTP connection timeout in milliseconds</description>
+    </property>
+
+    <property>
+        <name>fs.gs.http.read-timeout</name>
+        <value>60000</value>
+        <description>HTTP read timeout in milliseconds</description>
+    </property>
+</configuration>

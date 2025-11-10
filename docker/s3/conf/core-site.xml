@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+  AWS S3 Hadoop Configuration Template
+
+  Authentication Methods:
+    1. AWS Access Key / Secret Key
+    2. IAM Role (for EC2/EKS)
+    3. Instance Profile
+
+  Usage: Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY via environment
+  or use IAM roles for EKS pods.
+-->
+<configuration>
+    <!-- S3A FileSystem Implementation (Recommended over s3n) -->
+    <property>
+        <name>fs.s3a.impl</name>
+        <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+        <description>S3A filesystem implementation</description>
+    </property>
+
+    <!-- AWS Credentials (set via environment or IAM role) -->
+    <property>
+        <name>fs.s3a.access.key</name>
+        <value>${AWS_ACCESS_KEY_ID}</value>
+        <description>AWS access key ID (use environment variable)</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.secret.key</name>
+        <value>${AWS_SECRET_ACCESS_KEY}</value>
+        <description>AWS secret access key (use environment variable)</description>
+    </property>
+
+    <!-- S3 Endpoint (optional, for S3-compatible services) -->
+    <property>
+        <name>fs.s3a.endpoint</name>
+        <value>${S3_ENDPOINT}</value>
+        <description>
+            S3 endpoint URL (optional).
+            Leave empty for AWS S3, set for S3-compatible services.
+        </description>
+    </property>
+
+    <!-- Path Style Access (required for MinIO) -->
+    <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>false</value>
+        <description>
+            Use path-style access for S3.
+            Set to true for MinIO and other S3-compatible services.
+        </description>
+    </property>
+
+    <!-- SSL Configuration -->
+    <property>
+        <name>fs.s3a.connection.ssl.enabled</name>
+        <value>true</value>
+        <description>Enable SSL for S3 connections</description>
+    </property>
+
+    <!-- Performance Tuning -->
+    <property>
+        <name>fs.s3a.block.size</name>
+        <value>134217728</value>
+        <description>S3A block size (128MB)</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.connection.maximum</name>
+        <value>100</value>
+        <description>Maximum number of concurrent S3 connections</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.threads.max</name>
+        <value>20</value>
+        <description>Maximum threads for S3A operations</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.connection.timeout</name>
+        <value>200000</value>
+        <description>S3 connection timeout in milliseconds</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.attempts.maximum</name>
+        <value>20</value>
+        <description>Maximum retry attempts for S3 operations</description>
+    </property>
+
+    <!-- Multipart Upload Settings -->
+    <property>
+        <name>fs.s3a.multipart.size</name>
+        <value>104857600</value>
+        <description>Size of each part in multipart upload (100MB)</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.multipart.threshold</name>
+        <value>209715200</value>
+        <description>Threshold for multipart upload (200MB)</description>
+    </property>
+
+    <!-- Fast Upload (use disk for buffering) -->
+    <property>
+        <name>fs.s3a.fast.upload</name>
+        <value>true</value>
+        <description>Enable fast upload using disk buffering</description>
+    </property>
+
+    <property>
+        <name>fs.s3a.fast.upload.buffer</name>
+        <value>disk</value>
+        <description>Buffer type: disk, array, or bytebuffer</description>
+    </property>
+</configuration>
