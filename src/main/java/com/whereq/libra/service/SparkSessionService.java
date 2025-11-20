@@ -9,6 +9,9 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -37,6 +40,30 @@ public class SparkSessionService {
     @Autowired
     private JarJobExecutor jarJobExecutor;
 
+    /**
+     * Get all sessions reactively.
+     */
+    public Flux<SessionInfo> getAllSessionsReactive() {
+        return getSessionInfoReactive("default")
+                .flux();
+    }
+
+    /**
+     * Get session info reactively.
+     */
+    public Mono<SessionInfo> getSessionInfoReactive(String sessionId) {
+        return sessionManager.getOrCreateSessionReactive(sessionId)
+                .map(session -> SessionInfo.builder()
+                        .sessionId(sessionId)
+                        .appId(session.sparkContext().applicationId())
+                        .state("RUNNING")
+                        .master(session.sparkContext().master())
+                        .sparkVersion(session.version())
+                        .createdAt(LocalDateTime.now())
+                        .lastActivity(LocalDateTime.now())
+                        .build());
+    }
+
     public List<SessionInfo> getAllSessions() {
         // Return active session info
         SessionInfo info = getSessionInfo("default");
@@ -55,6 +82,14 @@ public class SparkSessionService {
                 .createdAt(LocalDateTime.now())
                 .lastActivity(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * Execute Spark job reactively.
+     */
+    public Mono<SparkJobResponse> executeJobReactive(String sessionId, SparkJobRequest request) {
+        return Mono.fromCallable(() -> executeJob(sessionId, request))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     public SparkJobResponse executeJob(String sessionId, SparkJobRequest request) {
@@ -210,6 +245,14 @@ public class SparkSessionService {
                     .executionTimeMs(executionTime)
                     .build();
         }
+    }
+
+    /**
+     * Delete session reactively.
+     */
+    public Mono<Void> deleteSessionReactive(String sessionId) {
+        log.info("Session deletion requested for: {}", sessionId);
+        return sessionManager.deleteSessionReactive(sessionId);
     }
 
     public void deleteSession(String sessionId) {

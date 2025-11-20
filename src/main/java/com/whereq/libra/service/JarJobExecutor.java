@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.spark.SparkConf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -29,6 +31,20 @@ public class JarJobExecutor {
 
     @Autowired
     private SparkConf sparkConf;
+
+    /**
+     * Execute JAR main class in-JVM reactively (recommended).
+     * The application's SparkSession.getOrCreate() will find the existing SparkSession.
+     *
+     * @param jarPath Path to JAR file
+     * @param mainClass Fully qualified main class name (e.g., com.example.MySparkApp)
+     * @param args Application arguments
+     * @return Mono of execution output
+     */
+    public Mono<String> executeJarInJVMReactive(String jarPath, String mainClass, String[] args) {
+        return Mono.fromCallable(() -> executeJarInJVM(jarPath, mainClass, args))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
 
     /**
      * Execute JAR main class in-JVM (recommended).
@@ -100,6 +116,22 @@ public class JarJobExecutor {
             System.setOut(originalOut);
             System.setErr(originalErr);
         }
+    }
+
+    /**
+     * Execute JAR using spark-submit reactively (separate process).
+     * Creates its own SparkSession in a separate JVM.
+     *
+     * @param jarPath Path to JAR file
+     * @param mainClass Fully qualified main class name
+     * @param args Application arguments
+     * @param pool Scheduler pool
+     * @param sparkConfig Per-job Spark configuration overrides
+     * @return Mono of execution output
+     */
+    public Mono<String> executeJarWithSparkSubmitReactive(String jarPath, String mainClass, String[] args, String pool, java.util.Map<String, String> sparkConfig) {
+        return Mono.fromCallable(() -> executeJarWithSparkSubmit(jarPath, mainClass, args, pool, sparkConfig))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     /**

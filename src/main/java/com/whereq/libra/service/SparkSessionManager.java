@@ -7,6 +7,8 @@ import org.apache.spark.sql.SparkSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import jakarta.annotation.PreDestroy;
 import java.io.File;
@@ -90,6 +92,17 @@ public class SparkSessionManager {
     }
 
     /**
+     * Get or create SparkSession reactively (wraps blocking operation).
+     *
+     * @param sessionId Session identifier
+     * @return Mono of SparkSession instance
+     */
+    public Mono<SparkSession> getOrCreateSessionReactive(String sessionId) {
+        return Mono.fromCallable(() -> getOrCreateSession(sessionId))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
      * Get SparkSession for session ID (returns null if not exists).
      */
     public SparkSession getSession(String sessionId) {
@@ -103,6 +116,17 @@ public class SparkSessionManager {
             return wrapper.getSession();
         }
         return null;
+    }
+
+    /**
+     * Get SparkSession reactively for session ID.
+     *
+     * @param sessionId Session identifier
+     * @return Mono of SparkSession (empty if not exists)
+     */
+    public Mono<SparkSession> getSessionReactive(String sessionId) {
+        return Mono.fromCallable(() -> getSession(sessionId))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     /**
@@ -123,6 +147,18 @@ public class SparkSessionManager {
                 log.error("Error closing session: {}", sessionId, e);
             }
         }
+    }
+
+    /**
+     * Delete session reactively by ID.
+     *
+     * @param sessionId Session identifier
+     * @return Mono that completes when session is deleted
+     */
+    public Mono<Void> deleteSessionReactive(String sessionId) {
+        return Mono.fromRunnable(() -> deleteSession(sessionId))
+                .subscribeOn(Schedulers.boundedElastic())
+                .then();
     }
 
     /**
