@@ -13,9 +13,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 /**
  * REST controller for submitting Spark jobs using spark-submit style operations.
@@ -81,53 +83,50 @@ public class SparkSubmitController {
             )
         )
     )
-    public ResponseEntity<JobSubmitResponse> submitJarJob(@Valid @RequestBody JarSubmitRequest request) {
+    public Mono<ResponseEntity<JobSubmitResponse>> submitJarJob(@Valid @RequestBody JarSubmitRequest request) {
         log.info("Received JAR job submission request: jar={}, mainClass={}, mode={}",
                 request.getJarPath(), request.getMainClass(), request.getExecutionMode());
 
         long startTime = System.currentTimeMillis();
-        JobSubmitResponse response;
 
-        try {
-            String output;
-            if (request.getExecutionMode() == JarSubmitRequest.ExecutionMode.IN_JVM) {
-                output = jarJobExecutor.executeJarInJVM(
-                        request.getJarPath(),
-                        request.getMainClass(),
-                        request.getArgs()
-                );
-            } else {
-                output = jarJobExecutor.executeJarWithSparkSubmit(
-                        request.getJarPath(),
-                        request.getMainClass(),
-                        request.getArgs(),
-                        request.getPool(),
-                        request.getSparkConfig()
-                );
-            }
-
-            long executionTime = System.currentTimeMillis() - startTime;
-            response = JobSubmitResponse.builder()
-                    .status(JobSubmitResponse.JobStatus.SUCCESS)
-                    .output(output)
-                    .executionTimeMs(executionTime)
-                    .build();
-
-            log.info("JAR job completed successfully in {}ms", executionTime);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            long executionTime = System.currentTimeMillis() - startTime;
-            log.error("JAR job failed after {}ms", executionTime, e);
-
-            response = JobSubmitResponse.builder()
-                    .status(JobSubmitResponse.JobStatus.FAILED)
-                    .errorMessage(e.getMessage())
-                    .executionTimeMs(executionTime)
-                    .build();
-
-            return ResponseEntity.status(500).body(response);
+        Mono<String> executionMono;
+        if (request.getExecutionMode() == JarSubmitRequest.ExecutionMode.IN_JVM) {
+            executionMono = jarJobExecutor.executeJarInJVMReactive(
+                    request.getJarPath(),
+                    request.getMainClass(),
+                    request.getArgs()
+            );
+        } else {
+            executionMono = jarJobExecutor.executeJarWithSparkSubmitReactive(
+                    request.getJarPath(),
+                    request.getMainClass(),
+                    request.getArgs(),
+                    request.getPool(),
+                    request.getSparkConfig()
+            );
         }
+
+        return executionMono
+                .map(output -> {
+                    long executionTime = System.currentTimeMillis() - startTime;
+                    JobSubmitResponse response = JobSubmitResponse.builder()
+                            .status(JobSubmitResponse.JobStatus.SUCCESS)
+                            .output(output)
+                            .executionTimeMs(executionTime)
+                            .build();
+                    log.info("JAR job completed successfully in {}ms", executionTime);
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(e -> {
+                    long executionTime = System.currentTimeMillis() - startTime;
+                    log.error("JAR job failed after {}ms", executionTime, e);
+                    JobSubmitResponse response = JobSubmitResponse.builder()
+                            .status(JobSubmitResponse.JobStatus.FAILED)
+                            .errorMessage(e.getMessage())
+                            .executionTimeMs(executionTime)
+                            .build();
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response));
+                });
     }
 
     @PostMapping("/submit/python")
@@ -188,7 +187,7 @@ public class SparkSubmitController {
             )
         )
     )
-    public ResponseEntity<JobSubmitResponse> submitPythonJob(@Valid @RequestBody PythonSubmitRequest request) {
+    public Mono<ResponseEntity<JobSubmitResponse>> submitPythonJob(@Valid @RequestBody PythonSubmitRequest request) {
         // Validate that either filePath or pythonCode is provided, but not both
         if ((request.getFilePath() == null || request.getFilePath().isBlank()) &&
             (request.getPythonCode() == null || request.getPythonCode().isBlank())) {
@@ -196,7 +195,7 @@ public class SparkSubmitController {
                     .status(JobSubmitResponse.JobStatus.FAILED)
                     .errorMessage("Either filePath or pythonCode must be provided")
                     .build();
-            return ResponseEntity.badRequest().body(response);
+            return Mono.just(ResponseEntity.badRequest().body(response));
         }
 
         if (request.getFilePath() != null && !request.getFilePath().isBlank() &&
@@ -205,54 +204,51 @@ public class SparkSubmitController {
                     .status(JobSubmitResponse.JobStatus.FAILED)
                     .errorMessage("Only one of filePath or pythonCode should be provided, not both")
                     .build();
-            return ResponseEntity.badRequest().body(response);
+            return Mono.just(ResponseEntity.badRequest().body(response));
         }
 
         log.info("Received Python job submission request: filePath={}, hasCode={}",
                 request.getFilePath(), request.getPythonCode() != null && !request.getPythonCode().isBlank());
 
         long startTime = System.currentTimeMillis();
-        JobSubmitResponse response;
 
-        try {
-            String output;
-            if (request.getPythonCode() != null && !request.getPythonCode().isBlank()) {
-                output = pythonJobExecutor.executePythonCode(
-                        request.getPythonCode(),
-                        request.getPool(),
-                        request.getSparkConfig()
-                );
-            } else {
-                output = pythonJobExecutor.executePythonFile(
-                        request.getFilePath(),
-                        request.getArgs(),
-                        request.getPool(),
-                        request.getSparkConfig()
-                );
-            }
-
-            long executionTime = System.currentTimeMillis() - startTime;
-            response = JobSubmitResponse.builder()
-                    .status(JobSubmitResponse.JobStatus.SUCCESS)
-                    .output(output)
-                    .executionTimeMs(executionTime)
-                    .build();
-
-            log.info("Python job completed successfully in {}ms", executionTime);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            long executionTime = System.currentTimeMillis() - startTime;
-            log.error("Python job failed after {}ms", executionTime, e);
-
-            response = JobSubmitResponse.builder()
-                    .status(JobSubmitResponse.JobStatus.FAILED)
-                    .errorMessage(e.getMessage())
-                    .output(e.toString())
-                    .executionTimeMs(executionTime)
-                    .build();
-
-            return ResponseEntity.status(500).body(response);
+        Mono<String> executionMono;
+        if (request.getPythonCode() != null && !request.getPythonCode().isBlank()) {
+            executionMono = pythonJobExecutor.executePythonCodeReactive(
+                    request.getPythonCode(),
+                    request.getPool(),
+                    request.getSparkConfig()
+            );
+        } else {
+            executionMono = pythonJobExecutor.executePythonFileReactive(
+                    request.getFilePath(),
+                    request.getArgs(),
+                    request.getPool(),
+                    request.getSparkConfig()
+            );
         }
+
+        return executionMono
+                .map(output -> {
+                    long executionTime = System.currentTimeMillis() - startTime;
+                    JobSubmitResponse response = JobSubmitResponse.builder()
+                            .status(JobSubmitResponse.JobStatus.SUCCESS)
+                            .output(output)
+                            .executionTimeMs(executionTime)
+                            .build();
+                    log.info("Python job completed successfully in {}ms", executionTime);
+                    return ResponseEntity.ok(response);
+                })
+                .onErrorResume(e -> {
+                    long executionTime = System.currentTimeMillis() - startTime;
+                    log.error("Python job failed after {}ms", executionTime, e);
+                    JobSubmitResponse response = JobSubmitResponse.builder()
+                            .status(JobSubmitResponse.JobStatus.FAILED)
+                            .errorMessage(e.getMessage())
+                            .output(e.toString())
+                            .executionTimeMs(executionTime)
+                            .build();
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response));
+                });
     }
 }

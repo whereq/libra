@@ -37,7 +37,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spark.version>4.0.1</spark.version>
         <scala.binary.version>2.13</scala.binary.version>
-	<maven.test.skip>true</maven.test.skip>
+    	<maven.test.skip>true</maven.test.skip>
     </properties>
 
     <dependencies>
@@ -96,6 +96,9 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- Note: WebFlux does not use Servlet API, but Spark may still need it internally -->
+        <!-- Removing jakarta.servlet-api as it's not needed with WebFlux -->
 
         <!-- JSON processing -->
         <dependency>

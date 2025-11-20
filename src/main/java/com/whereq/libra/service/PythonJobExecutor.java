@@ -5,6 +5,8 @@ import org.apache.spark.SparkConf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -25,6 +27,20 @@ public class PythonJobExecutor {
 
     @Autowired
     private SparkConf sparkConf;
+
+    /**
+     * Execute a Python script file reactively as a Spark job.
+     *
+     * @param filePath Path to Python script (can be absolute, relative, or classpath:)
+     * @param args Additional arguments to pass to the script
+     * @param pool Scheduler pool name
+     * @param sparkConfig Per-job Spark configuration overrides
+     * @return Mono of execution result
+     */
+    public Mono<String> executePythonFileReactive(String filePath, String[] args, String pool, java.util.Map<String, String> sparkConfig) {
+        return Mono.fromCallable(() -> executePythonFile(filePath, args, pool, sparkConfig))
+                .subscribeOn(Schedulers.boundedElastic());
+    }
 
     /**
      * Execute a Python script file as a Spark job.
@@ -80,6 +96,19 @@ public class PythonJobExecutor {
 
         log.info("Python job completed successfully");
         return output.toString();
+    }
+
+    /**
+     * Execute inline Python code reactively as a Spark job.
+     *
+     * @param code Python code to execute
+     * @param pool Scheduler pool name
+     * @param sparkConfig Per-job Spark configuration overrides
+     * @return Mono of execution result
+     */
+    public Mono<String> executePythonCodeReactive(String code, String pool, java.util.Map<String, String> sparkConfig) {
+        return Mono.fromCallable(() -> executePythonCode(code, pool, sparkConfig))
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     /**

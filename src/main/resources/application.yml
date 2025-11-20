@@ -4,8 +4,8 @@ spring:
 
 server:
   port: 8080
-  servlet:
-    context-path: /
+  # Note: WebFlux does not use servlet context path
+  # Use spring.webflux.base-path if needed for path prefix
 
 # Spark Configuration
 spark:

@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,33 +33,34 @@ public class SparkSessionController {
 
     @GetMapping
     @Operation(summary = "List all sessions", description = "Get information about all active Spark sessions")
-    public ResponseEntity<List<SessionInfo>> getSessions() {
+    public Flux<SessionInfo> getSessions() {
         log.info("Retrieving all Spark sessions");
-        return ResponseEntity.ok(sparkSessionService.getAllSessions());
+        return sparkSessionService.getAllSessionsReactive();
     }
 
     @GetMapping("/{sessionId}")
     @Operation(summary = "Get session info", description = "Get detailed information about a specific session")
-    public ResponseEntity<SessionInfo> getSession(@PathVariable String sessionId) {
+    public Mono<ResponseEntity<SessionInfo>> getSession(@PathVariable String sessionId) {
         log.info("Retrieving session info for session: {}", sessionId);
-        return ResponseEntity.ok(sparkSessionService.getSessionInfo(sessionId));
+        return sparkSessionService.getSessionInfoReactive(sessionId)
+                .map(ResponseEntity::ok);
     }
 
     @PostMapping("/{sessionId}/statements")
     @Operation(summary = "Execute Spark code", description = "Submit Spark code for execution in a session")
-    public ResponseEntity<SparkJobResponse> executeStatement(
+    public Mono<ResponseEntity<SparkJobResponse>> executeStatement(
             @PathVariable String sessionId,
             @Valid @RequestBody SparkJobRequest request) {
         log.info("Executing statement in session: {}", sessionId);
-        SparkJobResponse response = sparkSessionService.executeJob(sessionId, request);
-        return ResponseEntity.ok(response);
+        return sparkSessionService.executeJobReactive(sessionId, request)
+                .map(ResponseEntity::ok);
     }
 
     @DeleteMapping("/{sessionId}")
     @Operation(summary = "Delete session", description = "Terminate a Spark session")
-    public ResponseEntity<Void> deleteSession(@PathVariable String sessionId) {
+    public Mono<ResponseEntity<Void>> deleteSession(@PathVariable String sessionId) {
         log.info("Deleting session: {}", sessionId);
-        sparkSessionService.deleteSession(sessionId);
-        return ResponseEntity.noContent().build();
+        return sparkSessionService.deleteSessionReactive(sessionId)
+                .then(Mono.just(ResponseEntity.noContent().<Void>build()));
     }
 }
