@@ -97,8 +97,13 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Note: WebFlux does not use Servlet API, but Spark may still need it internally -->
-        <!-- Removing jakarta.servlet-api as it's not needed with WebFlux -->
+        <!-- Servlet API for Spark compatibility (provided scope to avoid conflicts with WebFlux) -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>5.0.0</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- JSON processing -->
         <dependency>
