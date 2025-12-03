@@ -42,6 +42,71 @@ libra:
       min-size: 2
       max-size: 10
 
+  # Phase 1: Async execution configuration
+  execution:
+    modes:
+      in-cluster:
+        enabled: true
+        limits:
+          max-executors: 5
+          max-memory-per-executor: 4g
+          max-cores-per-executor: 2
+          max-concurrent-jobs: 10
+
+      spark-submit:
+        enabled: true
+        spark-home: /opt/spark
+        timeout-minutes: 60
+
+      kubernetes:
+        enabled: false
+        namespace: spark-jobs
+        service-account: spark-operator
+        image: spark:4.0.1
+        ttl-seconds-after-finished: 3600
+
+  # Resource management
+  resources:
+    limits:
+      cpu-cores: ${K8S_CPU_LIMIT:16}
+      memory-gb: ${K8S_MEMORY_LIMIT:64}
+      max-concurrent-jobs: 10
+
+    monitor:
+      enabled: true
+      poll-interval: 5000  # milliseconds
+      alert-threshold:
+        cpu-percent: 90
+        memory-percent: 90
+
+  # Job queue configuration
+  queue:
+    type: redis  # redis, postgresql, memory
+    persistence: true
+    max-size: 1000
+    max-wait-time-minutes: 30
+
+  # Retry configuration
+  retry:
+    max-attempts: 3
+    backoff:
+      initial-interval-ms: 1000
+      multiplier: 2
+      max-interval-ms: 60000
+
+# Redis configuration (for job queue)
+spring:
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    timeout: 5000ms
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+
 # Management and Actuator
 management:
   endpoints:

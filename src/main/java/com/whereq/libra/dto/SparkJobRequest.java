@@ -1,11 +1,14 @@
 package com.whereq.libra.dto;
 
+import com.whereq.libra.model.Notifications;
+import com.whereq.libra.model.RetryPolicy;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -17,7 +20,8 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SparkJobRequest {
+public class SparkJobRequest implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     /**
      * Code to execute (for inline execution).
@@ -103,4 +107,44 @@ public class SparkJobRequest {
      *      - "spark.sql.adaptive.enabled": "true"
      */
     private Map<String, String> sparkConfig;
+
+    /**
+     * Execution mode for the job.
+     * Options: auto, in-cluster, spark-submit, kubernetes
+     * Default: auto (Libra selects based on resource requirements)
+     *
+     * - auto: Automatically select based on job size
+     * - in-cluster: Execute in Libra's JVM (fast, shared resources)
+     * - spark-submit: Launch separate process (medium isolation)
+     * - kubernetes: Create SparkApplication CRD (high isolation)
+     */
+    @Builder.Default
+    private String executionMode = "auto";
+
+    /**
+     * Job priority (1-10, where 10 is highest).
+     * Higher priority jobs are scheduled first when resources become available.
+     */
+    @Builder.Default
+    private int priority = 5;
+
+    /**
+     * Retry policy for failed jobs.
+     * If not specified, uses default policy (3 retries with exponential backoff)
+     */
+    private RetryPolicy retryPolicy;
+
+    /**
+     * Webhook notification configuration.
+     * If specified, Libra will send HTTP POST notifications for job events.
+     */
+    private Notifications notifications;
+
+    /**
+     * Maximum execution time in minutes.
+     * Job will be terminated if it exceeds this time.
+     * Default: 60 minutes
+     */
+    @Builder.Default
+    private int timeoutMinutes = 60;
 }
